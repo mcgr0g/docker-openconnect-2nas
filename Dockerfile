@@ -1,11 +1,20 @@
 FROM alpine:latest
 
-MAINTAINER MarkusMcNugen
-# Forked from TommyLau for unRAID
+ARG img_ver
+ARG build_date=$(date +%Y-%m-%d)
+# Forked from MarkusMcNugen/docker-openconnect ← TommyLau/docker-ocserv
+LABEL org.opencontainers.image.authors="Ronnie McGrog" \
+      org.opencontainers.image.url="https://github.com/mcgr0g/docker-openconnect-2nas" \
+      org.opencontainers.image.documentation="https://github.com/mcgr0g/docker-openconnect-2nas/blob/master/README.md" \
+      org.opencontainers.image.source="https://github.com/mcgr0g/docker-openconnect-2nas/blob/master/Dockerfile" \
+      org.opencontainers.image.title="openconnect-2nas" \
+      org.opencontainers.image.description="oscerv for home lab" \
+      org.opencontainers.image.version="${img_ver}" \
+      org.opencontainers.image.created="${build_date}"
 
 VOLUME /config
 
-# Install dependencies
+# build stage
 RUN buildDeps=" \
 		curl \
 		g++ \
@@ -38,11 +47,12 @@ RUN buildDeps=" \
 	"; \
 	set -x \
 	&& apk add --update --virtual .build-deps $buildDeps \
-	# The commented out line below grabs the most recent version of OC from the page which may be an unreleased version
-	# && export OC_VERSION=$(curl --silent "https://ocserv.gitlab.io/www/changelog.html" 2>&1 | grep -m 1 'Version' | awk '/Version/ {print $2}') \
-	# The line below grabs the 2nd most recent version of OC
-	&& export OC_VERSION=$(curl --silent "https://ocserv.gitlab.io/www/changelog.html" 2>&1 | grep -m 2 'Version' | tail -n 1 | awk '/Version/ {print $2}') \
-	&& curl -SL "ftp://ftp.infradead.org/pub/ocserv/ocserv-$OC_VERSION.tar.xz" -o ocserv.tar.xz \
+	&& export OC_VERSION=$(\
+        curl --silent "https://ocserv.gitlab.io/www/download.html" 2>&1 \
+            | grep -m 2 'The latest version of ocserv is'\
+            | awk '/The latest version/ {print $NF}'\
+        ) \
+	&& curl -SL "https://www.infradead.org/ocserv/download/ocserv-$OC_VERSION.tar.xz" -o ocserv.tar.xz \
 	&& mkdir -p /usr/src/ocserv \
 	&& tar -xf ocserv.tar.xz -C /usr/src/ocserv --strip-components=1 \
 	&& rm ocserv.tar.xz* \
@@ -52,20 +62,29 @@ RUN buildDeps=" \
 	&& make install \
 	&& cd / \
 	&& rm -rf /usr/src/ocserv \
-	&& runDeps="$( \
+    && apk del .build-deps
+
+# runner stage
+RUN  runDeps="$( \
 			scanelf --needed --nobanner /usr/local/sbin/ocserv \
 				| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
 				| xargs -r apk info --installed \
 				| sort -u \
 			)" \
-	&& apk add --update --virtual .run-deps $runDeps gnutls-utils iptables \
-	&& apk del .build-deps \
-	&& rm -rf /var/cache/apk/* 
-	
-RUN apk add --update bash rsync ipcalc sipcalc ca-certificates rsyslog logrotate runit \
-	&& rm -rf /var/cache/apk/* 
-
-RUN update-ca-certificates
+    # gnutls krb5-libs libev libtasn1 linux-pam musl nettle
+	&& apk add $runDeps \
+        gnutls-utils \
+        iptables \
+        ipcalc \
+        sipcalc \
+        ca-certificates \
+        bash \
+        rsync \
+        rsyslog \
+        logrotate \
+        runit \
+	&& rm -rf /var/cache/apk/* \
+    && update-ca-certificates
 
 ADD ocserv /etc/default/ocserv
 

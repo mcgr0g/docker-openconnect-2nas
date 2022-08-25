@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copy default config files if removed
 if [[ ! -e /config/ocserv.conf || ! -e /config/connect.sh || ! -e /config/disconnect.sh ]]; then
@@ -8,17 +8,8 @@ fi
 chmod a+x /config/*.sh
 
 ##### Verify Variables #####
-export POWER_USER=$(echo "${POWER_USER}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-# Check POWER_USER env var
-if [[ ! -z "${POWER_USER}" ]]; then
-	echo "$(date) [info] POWER_USER defined as '${POWER_USER}'"
-else
-	echo "$(date) [warn] POWER_USER not defined,(via -e POWER_USER), defaulting to 'no'"
-	export POWER_USER="no"
-fi
-
-export LISTEN_PORT=$(echo "${LISTEN_PORT}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-# Check PROXY_SUPPORT env var
+# похоже, что `sed -e 's/^[ \t]*//;s/[ \t]*$//'` удаляет лишнюю табуляцию
+export LISTEN_PORT=$(echo "${LISTEN_PORT}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 if [[ ! -z "${LISTEN_PORT}" ]]; then
 	echo "$(date) [info] LISTEN_PORT defined as '${LISTEN_PORT}'"
 	echo "$(date) [warn] Make sure you changed the 4443 port in container settings to expose the port you selected!"
@@ -27,8 +18,7 @@ else
 	export LISTEN_PORT="4443"
 fi
 
-export TUNNEL_MODE=$(echo "${TUNNEL_MODE}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-# Check PROXY_SUPPORT env var
+export TUNNEL_MODE=$(echo "${TUNNEL_MODE}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 if [[ ! -z "${TUNNEL_MODE}" ]]; then
 	echo "$(date) [info] TUNNEL_MODE defined as '${TUNNEL_MODE}'"
 else
@@ -40,7 +30,7 @@ if [[ ${TUNNEL_MODE} == "all" ]]; then
 	echo "$(date) [info] Tunnel mode is all, ignoring TUNNEL_ROUTES. If you want to define specific routes, change TUNNEL_MODE to split-include"
 elif [[ ${TUNNEL_MODE} == "split-include" ]]; then
 	# strip whitespace from start and end of SPLIT_DNS_DOMAINS
-	export TUNNEL_ROUTES=$(echo "${TUNNEL_ROUTES}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
+	export TUNNEL_ROUTES=$(echo "${TUNNEL_ROUTES}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 	# Check SPLIT_DNS_DOMAINS env var and exit if not defined
 	if [[ ! -z "${TUNNEL_ROUTES}" ]]; then
 		echo "$(date) [info] TUNNEL_ROUTES defined as '${TUNNEL_ROUTES}'"
@@ -49,16 +39,7 @@ elif [[ ${TUNNEL_MODE} == "split-include" ]]; then
 	fi
 fi
 
-#export PROXY_SUPPORT=$(echo "${PROXY_SUPPORT}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-# Check PROXY_SUPPORT env var
-#if [[ ! -z "${PROXY_SUPPORT}" ]]; then
-#	echo "$(date) [info] PROXY_SUPPORT defined as '${PROXY_SUPPORT}'"
-#else
-#	echo "$(date) [warn] PROXY_SUPPORT not defined,(via -e PROXY_SUPPORT), defaulting to 'no'"
-#	export PROXY_SUPPORT="no"
-#fi
-
-export DNS_SERVERS=$(echo "${DNS_SERVERS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
+export DNS_SERVERS=$(echo "${DNS_SERVERS}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 # Check DNS_SERVERS env var
 if [[ ! -z "${DNS_SERVERS}" ]]; then
 		echo "$(date) [info] DNS_SERVERS defined as '${DNS_SERVERS}'"
@@ -67,7 +48,7 @@ if [[ ! -z "${DNS_SERVERS}" ]]; then
 		export DNS_SERVERS="8.8.8.8,37.235.1.174,8.8.4.4,37.235.1.177"
 fi
 
-export SPLIT_DNS_DOMAINS=$(echo "${SPLIT_DNS_DOMAINS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
+export SPLIT_DNS_DOMAINS=$(echo "${SPLIT_DNS_DOMAINS}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 if [[ ! -z "${SPLIT_DNS_DOMAINS}" ]]; then
 	# Check SPLIT_DNS_DOMAINS env var
 	if [[ ! -z "${SPLIT_DNS_DOMAINS}" ]]; then
@@ -81,75 +62,47 @@ fi
 ##### Process Variables #####
 if [ ${LISTEN_PORT} != "4443" ]; then
 	echo "$(date) [info] Modifying the listening port"
-	if [[ ${POWER_USER} == "yes" ]]; then
-		echo "$(date) [warn] Power user! Listening ports are not being written to ocserv.conf, you must manually modify the conf file yourself!"
-	else
-		#Find TCP/UDP line numbers and use sed to replace the lines
-		TCPLINE = $(grep -rne 'tcp-port =' ocserv.conf | grep -Eo '^[^:]+')
-		UDPLINE = $(grep -rne 'udp-port =' ocserv.conf | grep -Eo '^[^:]+')
-		sed -i "$(TCPLINE)s/.*/tcp-port = ${LISTEN_PORT}/" /config/ocserv.conf
-		sed -i "$(UDPLINE)s/.*/tcp-port = ${LISTEN_PORT}/" /config/ocserv.conf
-	fi
+    #Find TCP/UDP line numbers and use sed to replace the lines
+    TCPLINE = $(grep -rne 'tcp-port =' ocserv.conf | grep -Eo '^[^:]+')
+    UDPLINE = $(grep -rne 'udp-port =' ocserv.conf | grep -Eo '^[^:]+')
+    sed -i "$(TCPLINE)s/.*/tcp-port = ${LISTEN_PORT}/" /config/ocserv.conf
+    sed -i "$(UDPLINE)s/.*/tcp-port = ${LISTEN_PORT}/" /config/ocserv.conf
 fi
 
 if [[ ${TUNNEL_MODE} == "all" ]]; then
 	echo "$(date) [info] Tunneling all traffic through VPN"
-	if [[ ${POWER_USER} == "yes" ]]; then
-		echo "$(date) [warn] Power user! Routes are not being written to ocserv.conf, you must manually modify the conf file yourself!"
-	else
-		sed -i '/^route=/d' /config/ocserv.conf
-	fi
+    sed -i '/^route=/d' /config/ocserv.conf
 elif [[ ${TUNNEL_MODE} == "split-include" ]]; then
 	echo "$(date) [info] Tunneling routes $TUNNEL_ROUTES through VPN"
-	if [[ ${POWER_USER} == "yes" ]]; then
-		echo "$(date) [warn] Power user! Routes are not being written to ocserv.conf, you must manually modify the conf file yourself!"
-	else
-		sed -i '/^route=/d' /config/ocserv.conf
-		# split comma seperated string into list from TUNNEL_ROUTES env variable
-		IFS=',' read -ra tunnel_route_list <<< "${TUNNEL_ROUTES}"
-		# process name servers in the list
-		for tunnel_route_item in "${tunnel_route_list[@]}"; do
-			tunnel_route_item=$(echo "${tunnel_route_item}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-			IFS='/' read -ra ip_subnet_list <<< "${tunnel_route_item}"
-			STRLENGTH=$(echo -n ${ip_subnet_list[1]} | wc -m)
-			if [[ $STRLENGTH > "2" ]]; then
-				echo "$(date) [info] Full subnet mask detected in route ${tunnel_route_item}"
-				IP=$(sipcalc ${ip_subnet_list[0]} ${ip_subnet_list[1]} | awk '/Host address/ {print $4; exit}')
-				NETMASK=$(sipcalc ${ip_subnet_list[0]} ${ip_subnet_list[1]} | awk '/Network mask/ {print $4; exit}')
-			else
-				echo "$(date) [info] CIDR submet mask detected in route ${tunnel_route_item}"
-				IP=$(ipcalc -b ${tunnel_route_item} | awk '/Address/ {print $2}')
-				NETMASK=$(ipcalc -b ${tunnel_route_item} | awk '/Netmask/ {print $2}')
-			fi
-			#IP=$(ipcalc -b ${tunnel_route_item} | awk '/Address/ {print $2; exit}')
-			#NETMASK=$(ipcalc -b ${tunnel_route_item} | awk '/Netmask/ {print $2; exit}')
-			TUNDUP=$(cat /config/ocserv.conf | grep "route=${IP}/${NETMASK}")
-			if [[ -z "$TUNDUP" ]]; then
-				echo "$(date) [info] Adding route=$IP/$NETMASK to ocserv.conf"
-				echo "route=$IP/$NETMASK" >> /config/ocserv.conf
-			fi
-		done
-	fi
+    sed -i '/^route=/d' /config/ocserv.conf
+    # split comma seperated string into list from TUNNEL_ROUTES env variable
+    IFS=',' read -ra tunnel_route_list <<< "${TUNNEL_ROUTES}"
+    # process name servers in the list
+    for tunnel_route_item in "${tunnel_route_list[@]}"; do
+        tunnel_route_item=$(echo "${tunnel_route_item}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
+        IFS='/' read -ra ip_subnet_list <<< "${tunnel_route_item}"
+        STRLENGTH=$(echo -n ${ip_subnet_list[1]} | wc -m)
+        if [[ $STRLENGTH > "2" ]]; then
+            echo "$(date) [info] Full subnet mask detected in route ${tunnel_route_item}"
+            IP=$(sipcalc ${ip_subnet_list[0]} ${ip_subnet_list[1]} | awk '/Host address/ {print $4; exit}')
+            NETMASK=$(sipcalc ${ip_subnet_list[0]} ${ip_subnet_list[1]} | awk '/Network mask/ {print $4; exit}')
+        else
+            echo "$(date) [info] CIDR submet mask detected in route ${tunnel_route_item}"
+            IP=$(ipcalc -b ${tunnel_route_item} | awk '/Address/ {print $2}')
+            NETMASK=$(ipcalc -b ${tunnel_route_item} | awk '/Netmask/ {print $2}')
+        fi
+        #IP=$(ipcalc -b ${tunnel_route_item} | awk '/Address/ {print $2; exit}')
+        #NETMASK=$(ipcalc -b ${tunnel_route_item} | awk '/Netmask/ {print $2; exit}')
+        TUNDUP=$(cat /config/ocserv.conf | grep "route=${IP}/${NETMASK}")
+        if [[ -z "$TUNDUP" ]]; then
+            echo "$(date) [info] Adding route=$IP/$NETMASK to ocserv.conf"
+            echo "route=$IP/$NETMASK" >> /config/ocserv.conf
+        fi
+    done
 fi
 
-# Process PROXY_SUPPORT env var
-#if [[ ${POWER_USER} == "yes" ]]; then
-#	echo "$(date) Power user! Proxy support not being written to ocserv.conf, you must manually modify the conf file yourself!"
-#else
-#	if [[ $PROXY_SUPPORT == "yes" ]]; then
-#		echo "$(date) Enabling proxy support"
-#		sed -i 's/^#listen-proxy-proto/listen-proxy-proto/' /config/ocserv.conf
-#		sed -i 's/^#listen-clear-file/listen-clear-file/' /config/ocserv.conf
-#	else
-#		sed -i 's/^listen-proxy-proto/#listen-proxy-proto/' /config/ocserv.conf
-#		sed -i 's/^listen-clear-file/#listen-clear-file/' /config/ocserv.conf
-#	fi
-#fi
-
 # Add DNS_SERVERS to ocserv conf
-if [[ ${POWER_USER} == "yes" ]]; then
-	echo "$(date) [warn] Power user! DNS servers are not being written to ocserv.conf, you must manually modify the conf file yourself!"
-else
+if [[ ! -z "${DNS_SERVERS}" ]]; then
 	sed -i '/^dns =/d' /config/ocserv.conf
 	# split comma seperated string into list from NAME_SERVERS env variable
 	IFS=',' read -ra name_server_list <<< "${DNS_SERVERS}"
@@ -158,7 +111,7 @@ else
 		DNSDUP=$(cat /config/ocserv.conf | grep "dns = ${name_server_item}")
 		if [[ -z "$DNSDUP" ]]; then
 			# strip whitespace from start and end of lan_network_item
-			name_server_item=$(echo "${name_server_item}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
+			name_server_item=$(echo "${name_server_item}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 
 			echo "$(date) [info] Adding dns = ${name_server_item} to ocserv.conf"
 			echo "dns = ${name_server_item}" >> /config/ocserv.conf
@@ -179,7 +132,7 @@ if [[ ! -z "${SPLIT_DNS_DOMAINS}" ]]; then
 			DOMDUP=$(cat /config/ocserv.conf | grep "split-dns = ${split_domain_item}")
 			if [[ -z "$DOMDUP" ]]; then
 				# strip whitespace from start and end of lan_network_item
-				split_domain_item=$(echo "${split_domain_item}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
+				split_domain_item=$(echo "${split_domain_item}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 
 				echo "$(date) [info] Adding split-dns = ${split_domain_item} to ocserv.conf"
 				echo "split-dns = ${split_domain_item}" >> /config/ocserv.conf
@@ -218,6 +171,10 @@ if [ ! -f /config/certs/server-key.pem ] || [ ! -f /config/certs/server-cert.pem
 		SRV_DAYS=9999
 	fi
 
+    # use domain from cert for advertise
+    DEFAULTDOMAIN = $(grep -rne 'default-domain =' ocserv.conf | grep -Eo '^[^:]+')
+    sed -i "$(DEFAULTDOMAIN)s/.*/tcp-port = ${SRV_CN}/" /config/ocserv.conf
+
 	# Generate certs one
 	mkdir /config/certs
 	cd /config/certs
@@ -248,7 +205,7 @@ else
 fi
 
 # Open ipv4 ip forward
-sysctl -w net.ipv4.ip_forward=1
+# sysctl -w net.ipv4.ip_forward=1
 
 # Enable NAT forwarding
 iptables -t nat -A POSTROUTING -j MASQUERADE

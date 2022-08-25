@@ -5,42 +5,44 @@
 # OpenConnect VPN Server
 OpenConnect VPN server is an SSL VPN server that is secure, small, fast and configurable. It implements the OpenConnect SSL VPN protocol and has also (currently experimental) compatibility with clients using the AnyConnect SSL VPN protocol. The OpenConnect protocol provides a dual TCP/UDP VPN channel and uses the standard IETF security protocols to secure it. The OpenConnect client is multi-platform and available [here](http://www.infradead.org/openconnect/). Alternatively, you can try connecting using the official Cisco AnyConnect client (Confirmed working on Android).
 
-The dockerfile was written to always download and compile the latest release of OpenConnect VPN server when built.*
-
-\* OpenConnect dev team has taken to listing unreleased versions on the page I pull with curl to get the current version so I had to modify the command to pull the second most recent version instead. Since I dont control this page it is subject to change back at anytime, keep that in mind if you fork this container.
-
 [Homepage](https://ocserv.gitlab.io/www/platforms.html)
 
 [Documentation](https://ocserv.gitlab.io/www/manual.html)
 
 [Source](https://gitlab.com/ocserv/ocserv)
 
-# Docker Features
-* Base: Alpine 3.13
-* Latest OpenConnect Server 1.1.2
-* Size: 63.6MB 
+# Restrictions
+Fork is in testing.
+Container running in privelegged mode, use it for own risk.
+For example,make shure you are use latest kernel and turned off shell or web access.
+For this reason there is no certbot in build.
+
+# Features
+* The dockerfile always download and compile the *latest* release of OpenConnect VPN server
+* Entrypoint can use your own ocserv.conf, cli or compose env var will owerwrite it
 * Modification of the listening port for more networking versatility
 * Customizing the DNS servers used for queries over the VPN
 * Supports tunneling all traffic over the VPN or tunneling only specific routes via split-include
 * Config directory can be mounted to a host directory for persistence 
 * Create certs automatically using default or provided values, or drop your own certs in /config/certs
-* Advanced manual configuration for power users
 
 # Run container from Docker registry
 The container is available from the Docker registry and this is the simplest way to get it.
 
 ## Basic Configuration
 ### Without customizing cert variables
-```
+```bash
 $ docker run --privileged  -d \
-              -p 4443:4443 \
+              -p 4443:4443 \
               -p 4443:4443/udp \
-              markusmcnugen/openconnect
+              mcgr0g/openconnect-2nas
 ```
+or for local test run `make simple`
+
 ### With customizing cert variables
-```
+```bash
 $ docker run --privileged  -d \
-              -p 4443:4443 \
+              -p 4443:4443 \
               -p 4443:4443/udp \
               -e "CA_CN=VPN CA" \
               -e "CA_ORG=OCSERV" \
@@ -48,8 +50,9 @@ $ docker run --privileged  -d \
               -e "SRV_CN=vpn.example.com" \
               -e "SRV_ORG=MyCompany" \
               -e "SRV_DAYS=9999" \
-              markusmcnugen/openconnect
+              mcgr0g/openconnect-2nas
 ```
+or for local test configure Makefile and run `make customcert`
 
 ## Intermediate Configuration (Providing own certs in /config/certs and running on port 443):
 Cert files are stored in /config/certs. It will automatically generate certs if the following two files are not present in the cert directory:
@@ -57,55 +60,69 @@ Cert files are stored in /config/certs. It will automatically generate certs if 
 server-key.pem
 server-cert.pem
 ```
-```
+```bash
 $ docker run --privileged  -d \
               -v /your/config/path/:/config \
               -e "LISTEN_PORT=443" \
-              -e "DNS_SERVERS=192.168.1.190" \
+              -e "DNS_SERVERS=192.168.1.190" \
               -e "TUNNEL_MODE=split-include" \
               -e "TUNNEL_ROUTES=192.168.1.0/24" \
               -e "SPLIT_DNS_DOMAINS=example.com" \
               -p 443:443 \
               -p 443:443/udp \
-              markusmcnugen/openconnect
+              --name openconnect
+              mcgr0g/openconnect-2nas
 ```
 
-## Advanced Configuration:
-This container allows for advanced configurations for power users who know what they are doing by **mounting the /config volume to a host directory**. Users can then drop in their own certs and modify the configuration. The **POWER_USER** environmental variable is required to stop the container from overwriting options set from container environment variables. Some advanced features include setting up site to site VPN links, User Groups, Proxy Protocol support and more.
+### With pregenerated cetrs
+```docker
+version: "3"
+
+services:
+  ocserv:
+    container_name: openconnect
+    image: mcgr0g/openconnect-2nas:latest
+    ports:
+      - "443:443/tcp"
+      - "443:443/udp"
+    environment:
+      LISTEN_PORT: 443
+      TUNNEL_MODE: 'split-include'
+      TUNNEL_ROUTES: '192.168.1.0/24, 192.168.2.0/24'
+      DNS_SERVERS: 192.168.2.1
+      SPLIT_DNS_DOMAINS: 'router.lan'
+      CA_CN: 'VPN CA'
+      CA_ORG: 'OCSERV'
+      CA_DAYS: 9999 
+      SRV_CN: 'vpn.example.com'
+      SRV_ORG: 'Example Company'
+      SRV_DAYS: 9999
+    volumes:
+      - './config/:/config/'
+    cap_add:
+      - NET_ADMIN
+    privileged: true
+    restart: unless-stopped
+```
 
 # Variables
-## Environment Variables
 | Variable | Required | Function | Example |
 |----------|----------|----------|----------|
 |`LISTEN_PORT`| No | Listening port for VPN connections|`LISTEN_PORT=4443`|
 |`DNS_SERVERS`| No | Comma delimited name servers |`DNS_SERVERS=8.8.8.8,8.8.4.4`|
 |`TUNNEL_MODE`| No | Tunnel mode (all / split-include) |`TUNNEL_MODE=split-include`|
 |`TUNNEL_ROUTES`| No | Comma delimited tunnel routes in CIDR notation |`TUNNEL_ROUTES=192.168.1.0/24`|
+|`DNS_SERVERS`| NO | Comma delimited DNS servers ip | `DNS_SERVERS="8.8.8.8,37.235.1.174,8.8.4.4,37.235.1.177"`|
 |`SPLIT_DNS_DOMAINS`| No | Comma delimited dns domains |`SPLIT_DNS_DOMAINS=example.com`|
-|`POWER_USER`| No | Allows for advanced manual configuration via host mounted /config volume |`POWER_USER=no`|
 
-## Volumes
-| Volume | Required | Function | Example |
-|----------|----------|----------|----------|
-| `config` | No | OpenConnect config files | `/your/config/path/:/config`|
-
-## Ports
-| Port | Proto | Required | Function | Example |
-|----------|----------|----------|----------|----------|
-| `4443` | TCP | Yes | OpenConnect server TCP listening port | `4443:4443`|
-| `4443` | UDP | Yes | OpenConnect server UDP listening port | `4443:4443/udp`|
 
 # How to use this OpenConnect Server Docker
 Install and run the docker container with your chosen options. Port forward incoming traffic on your router, some outside port to the containers IP and the listening port on the inside. After port forwarding is established you will need to create VPN accounts for users to login with usernames and passwords.
 
-## Example:
-Incoming Outside Port 4443 Forwarding TCP and UDP to the OpenConnect Servers inside IP address and listening port
-![Port Forward Example](https://raw.githubusercontent.com/MarkusMcNugen/docker-templates/master/openconnect/Port%20Forward%20Example.png)
-
 ## Add User/Change Password
 Add users by executing the following command on the host running the docker container
 ```
-docker exec -ti openconnect ocpasswd -c /config/ocpasswd markusmcnugen
+docker exec -it openconnect ocpasswd -c /config/ocpasswd mcgr0g
 Enter password:
 Re-enter password:
 ```
@@ -113,7 +130,7 @@ Re-enter password:
 ## Delete User
 Delete users by executing the following command on the host running the docker container
 ```
-docker exec -ti openconnect ocpasswd -c /config/ocpasswd -d markusmcnugen
+docker exec -it openconnect ocpasswd -c /config/ocpasswd -d mcgr0g
 ```
 
 ## Login and Logout Log Messages
@@ -133,15 +150,8 @@ To build this container, clone the repository and cd into it.
 
 ### Build it:
 ```
-$ cd /repo/location/openconnect
-$ docker build -t openconnect .
-```
-### Run it:
-```
-$ docker run --privileged  -d \
-              -p 4443:4443 \
-              -p 4443:4443/udp \
-              openconnect
+$ cd /repo/location/openconnect-2nas
+$ docker build -t opopenconnect-2nasnconnect .
 ```
 
-This will start a container as described in the "Run container from Docker registry" section. View the other run configurations for more advanced setups.
+or use `make build`
