@@ -11,6 +11,8 @@ OpenConnect VPN server is an SSL VPN server that is secure, small, fast and conf
 
 [Source](https://gitlab.com/ocserv/ocserv)
 
+[Image Build](https://github.com/mcgr0g/docker-openconnect-2nas)
+
 # Restrictions
 Fork is in testing.
 Container running in privelegged mode, use it for own risk.
@@ -55,11 +57,13 @@ $ docker run --privileged  -d \
 or for local test configure Makefile and run `make customcert`
 
 ## Intermediate Configuration (Providing own certs in /config/certs and running on port 443):
-Cert files are stored in /config/certs. It will automatically generate certs if the following two files are not present in the cert directory:
+Cert files are stored in /config/certs. It will automatically generate certs if the following two files 
 ```
 server-key.pem
 server-cert.pem
 ```
+are not present in the cert directory.
+
 ```bash
 $ docker run --privileged  -d \
               -v /your/config/path/:/config \
@@ -74,7 +78,7 @@ $ docker run --privileged  -d \
               mcgr0g/openconnect-2nas
 ```
 
-### With pregenerated cetrs
+### With compose
 ```docker
 version: "3"
 
@@ -109,7 +113,6 @@ services:
 | Variable | Required | Function | Example |
 |----------|----------|----------|----------|
 |`LISTEN_PORT`| No | Listening port for VPN connections|`LISTEN_PORT=4443`|
-|`DNS_SERVERS`| No | Comma delimited name servers |`DNS_SERVERS=8.8.8.8,8.8.4.4`|
 |`TUNNEL_MODE`| No | Tunnel mode (all / split-include) |`TUNNEL_MODE=split-include`|
 |`TUNNEL_ROUTES`| No | Comma delimited tunnel routes in CIDR notation |`TUNNEL_ROUTES=192.168.1.0/24`|
 |`DNS_SERVERS`| NO | Comma delimited DNS servers ip | `DNS_SERVERS="8.8.8.8,37.235.1.174,8.8.4.4,37.235.1.177"`|
