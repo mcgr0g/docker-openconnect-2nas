@@ -121,24 +121,20 @@ fi
 
 # Process SPLIT_DNS env var
 if [[ ! -z "${SPLIT_DNS_DOMAINS}" ]]; then
-	if [[ ${POWER_USER} == "yes" ]]; then
-		echo "$(date) [warn] Power user! Split-DNS domains are not being written to ocserv.conf, you must manually modify the conf file yourself!"
-	else
-		sed -i '/^split-dns =/d' /config/ocserv.conf
-		# split comma seperated string into list from SPLIT_DNS_DOMAINS env variable
-		IFS=',' read -ra split_domain_list <<< "${SPLIT_DNS_DOMAINS}"
-		# process name servers in the list
-		for split_domain_item in "${split_domain_list[@]}"; do
-			DOMDUP=$(cat /config/ocserv.conf | grep "split-dns = ${split_domain_item}")
-			if [[ -z "$DOMDUP" ]]; then
-				# strip whitespace from start and end of lan_network_item
-				split_domain_item=$(echo "${split_domain_item}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
+    sed -i '/^split-dns =/d' /config/ocserv.conf
+    # split comma seperated string into list from SPLIT_DNS_DOMAINS env variable
+    IFS=',' read -ra split_domain_list <<< "${SPLIT_DNS_DOMAINS}"
+    # process name servers in the list
+    for split_domain_item in "${split_domain_list[@]}"; do
+        DOMDUP=$(cat /config/ocserv.conf | grep "split-dns = ${split_domain_item}")
+        if [[ -z "$DOMDUP" ]]; then
+            # strip whitespace from start and end of lan_network_item
+            split_domain_item=$(echo "${split_domain_item}" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 
-				echo "$(date) [info] Adding split-dns = ${split_domain_item} to ocserv.conf"
-				echo "split-dns = ${split_domain_item}" >> /config/ocserv.conf
-			fi
-		done
-	fi
+            echo "$(date) [info] Adding split-dns = ${split_domain_item} to ocserv.conf"
+            echo "split-dns = ${split_domain_item}" >> /config/ocserv.conf
+        fi
+    done
 fi
 
 ##### Generate certs if none exist #####
